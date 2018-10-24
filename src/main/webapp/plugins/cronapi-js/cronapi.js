@@ -1,7 +1,28 @@
 (function() {
   'use strict';
 
+  this.$evt = function(str) {
+    var self = this;
+    if (!self.$eval) {
+      self = angular.element(event.target).scope();
+    }
+
+    self.$eval(str);
+  }.bind(this);
+
   this.cronapi = {};
+
+  this.cronapi.toDate = function(value) {
+    return new Date(value);
+  }
+
+  var getDatasource = function(ds) {
+    if (typeof ds == 'string') {
+      return window[ds];
+    } else {
+      return ds;
+    }
+  }
 
   this.cronapi.doEval = function(arg) {
     return arg;
@@ -19,6 +40,81 @@
       return result.value;
     }
   }
+
+  this.cronapi.client = function(pack) {
+    return {
+      attr: function() {
+        return this;
+      },
+      run: function() {
+        var bk = eval('blockly.'+pack);
+        return bk.apply(this, arguments);
+      }.bind(this)
+    }
+  };
+
+  var serverMap = {};
+
+  this.cronapi.server = function(pack) {
+    var attr = false;
+    return {
+      attr: function() {
+        attr = true;
+        return this;
+      },
+      run: function() {
+        var key = pack;
+
+        for (var i = 0;i <arguments.length;i++) {
+          key += String(arguments[i]);
+        }
+
+        if (attr) {
+          if (serverMap.hasOwnProperty(key)) {
+            if (serverMap[key] != "$$loading") {
+              return serverMap[key];
+            } else {
+              return "";
+            }
+          }
+
+          serverMap[key] = "$$loading";
+        }
+
+        var parts = pack.split(".");
+        var func = parts[parts.length-1];
+        parts.pop();
+        var namespace = parts.join(".");
+
+        var blocklyName = namespace + ":" + func;
+
+        var success = function(data) {
+          this.safeApply(function() {
+            if (attr) {
+              serverMap[key] = data;
+            }
+          });
+        }.bind(this);
+
+        var error = function(error) {
+          this.safeApply(function() {
+            if (attr) {
+              serverMap[key] = error;
+            }
+          });
+        }.bind(this);
+
+        var args = [blocklyName, error, success];
+
+        for (var i = 0;i <arguments.length;i++) {
+          args.push(arguments[i]);
+        }
+
+        this.cronapi.util.makeCallServerBlocklyAsync.apply(this, args);
+
+      }.bind(this)
+    }
+  };
 
   /**
    * @category CategoryType.CONVERSION
@@ -464,6 +560,82 @@
 
   /**
    * @type function
+   * @name {{getURLFromOthersName}}
+   * @description {{getURLFromOthersDescription}}
+   * @nameTags URL|API|Content|Download|Address|Endereco|Conteudo
+   * @param {ObjectType.STRING} method {{HTTPMethod}}
+   * @param {ObjectType.STRING} contentType {{contentType}}
+   * @param {ObjectType.STRING} url {{URLAddress}}
+   * @param {ObjectType.STRING} params {{paramsHTTP}}
+   * @param {ObjectType.STRING} headers {{headers}}
+   * @param {ObjectType.STRING} success {{success}}
+   * @param {ObjectType.STRING} error {{error}}
+   */
+  this.cronapi.util.getURLFromOthers = function(/** @type {ObjectType.STRING} @description {{HTTPMethod}} @blockType util_dropdown @keys GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE @values GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE  */  method , /** @type {ObjectType.STRING} @description {{HTTPMethod}} @blockType util_dropdown @keys application/x-www-form-urlencoded|application/json @values application/x-www-form-urlencoded|application/json  */  contentType , /** @type {ObjectType.STRING} @description {{URLAddress}} */ url, /** @type {ObjectType.OBJECT} @description {{paramsHTTP}} */ params, /** @type {ObjectType.OBJECT} @description {{headers}} */ headers, /** @type {ObjectType.STATEMENTSENDER} @description {{success}} */ success, /** @type {ObjectType.STATEMENTSENDER} @description {{error}} */  error ) {
+
+    var header = Object.create(headers);
+    header["Content-Type"] = contentType;
+    // Angular has a .run that inject X-AUTH-TOKEN, so we use JQuery
+    $.ajax({
+      method : method,
+      url : url,
+      data: params,
+      headers: header
+    }).success(success.bind(this)).error(error.bind(this));
+
+  };
+
+  /**
+   * @type function
+   * @name {{setSessionStorage}}
+   * @nameTags storage | session | sessão | armazenamento
+   * @description {{setSessionStorageDesc}}
+   * @param {ObjectType.STRING} key {{key}}
+   * @param {ObjectType.STRING} value {{value}}
+   */
+  this.cronapi.util.setSessionStorage = function(key, value) {
+    window.sessionStorage.setItem(key, value);
+  };
+
+  /**
+   * @type function
+   * @name {getSessionStorage}}
+   * @nameTags storage | session | sessão | armazenamento
+   * @description {{getSessionStorageDesc}}
+   * @param {ObjectType.STRING} key {{key}}
+   * @returns {ObjectType.OBJECT}
+   */
+  this.cronapi.util.getSessionStorage = function(key) {
+    return window.sessionStorage.getItem(key);
+  };
+
+  /**
+   * @type function
+   * @name {{setLocalStorage}}
+   * @nameTags storage | session | sessão | armazenamento
+   * @description {{setLocalStorageDesc}}
+   * @param {ObjectType.STRING} key {{key}}
+   * @param {ObjectType.STRING} value {{value}}
+   */
+  this.cronapi.util.setLocalStorage = function(key, value) {
+    window.localStorage.setItem(key, value);
+  };
+
+  /**
+   * @type function
+   * @name {{getLocalStorage}}
+   * @nameTags storage | session | sessão | armazenamento
+   * @description {{getLocalStorageDesc}}
+   * @param {ObjectType.STRING} key {{key}}
+   * @returns {ObjectType.STRING}
+   */
+  this.cronapi.util.getLocalStorage = function(key) {
+    return window.localStorage.getItem(key);
+  };
+
+
+  /**
+   * @type function
    * @name {{executeAsynchronousName}}
    * @nameTags Executar|Assíncrono|Execute| Asynchronous
    * @description {{executeAsynchronousDescription}}
@@ -571,10 +743,10 @@
   this.cronapi.screen.getValueOfField = function(/** @type {ObjectType.STRING} @blockType field_from_screen*/ field) {
     try {
       if (field && field.length > 0) {
-        if (field.indexOf('vars.') > -1)
-          return eval('this.'+field);
+        if (field.indexOf('.active.') > -1)
+          return eval(field);
         else
-          return this[field];
+          return eval('this.'+field);
       }
       return '';
     }
@@ -617,6 +789,10 @@
    * @multilayer true
    */
   this.cronapi.screen.notify = function(/** @type {ObjectType.STRING} */ type, /** @type {ObjectType.STRING} */  message) {
+    if (message == null || message == undefined) {
+      message = '';
+    }
+
     this.cronapi.$scope.Notification({'message':message.toString() },type);
   };
 
@@ -643,7 +819,7 @@
    * @multilayer true
    */
   this.cronapi.screen.startInsertingMode = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].$apply( function() { window[datasource].startInserting();});
+    getDatasource(datasource).$apply( function() { getDatasource(datasource).startInserting();});
   };
 
   /**
@@ -655,7 +831,7 @@
    * @multilayer true
    */
   this.cronapi.screen.startEditingMode = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].$apply( new function(){window[datasource].startEditing();} );
+    getDatasource(datasource).$apply( new function(){getDatasource(datasource).startEditing();} );
   };
 
   /**
@@ -667,7 +843,7 @@
    * @multilayer true
    */
   this.cronapi.screen.previusRecord = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].$apply( new function(){window[datasource].previous();} );
+    getDatasource(datasource).$apply( new function(){getDatasource(datasource).previous();} );
   };
 
   /**
@@ -679,7 +855,7 @@
    * @multilayer true
    */
   this.cronapi.screen.nextRecord = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].$apply( new function(){window[datasource].next();} );
+    getDatasource(datasource).$apply( new function(){getDatasource(datasource).next();} );
   };
 
   /**
@@ -691,7 +867,7 @@
    * @multilayer true
    */
   this.cronapi.screen.removeRecord = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].$apply( new function(){window[datasource].remove();} );
+    getDatasource(datasource).$apply( new function(){getDatasource(datasource).removeSilent();} );
   };
 
   /**
@@ -703,7 +879,7 @@
    * @multilayer true
    */
   this.cronapi.screen.refreshActiveRecord = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    window[datasource].refreshActive();
+    getDatasource(datasource).refreshActive();
   };
 
   /**
@@ -715,7 +891,7 @@
    * @returns {ObjectType.BOOLEAN}
    */
   this.cronapi.screen.hasNextRecord = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    return window[datasource].hasNext();
+    return getDatasource(datasource).hasNext();
   };
 
   /**
@@ -727,7 +903,7 @@
    * @returns {ObjectType.LONG}
    */
   this.cronapi.screen.quantityRecords = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    return window[datasource].data.length;
+    return getDatasource(datasource).data.length;
   };
 
   /**
@@ -739,7 +915,7 @@
    * @multilayer true
    */
   this.cronapi.screen.post = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource) {
-    return window[datasource].post();
+    return getDatasource(datasource).postSilent();
   };
 
   /**
@@ -752,7 +928,7 @@
    * @multilayer true
    */
   this.cronapi.screen.filter = function(/** @type {ObjectType.OBJECT} @blockType datasource_from_screen*/ datasource,/** @type {ObjectType.STRING}*/ path) {
-    window[datasource].filter("/"+path);
+    getDatasource(datasource).filter("/"+path);
   };
 
   /**
@@ -767,16 +943,21 @@
    */
   this.cronapi.screen.changeView = function(view, params) {
     try {
-      var queryString = '?';
-      var template = '#key#=#value#&';
+      var queryString = '';
+
       if (typeof params != 'undefined') {
         for (var i in Object.keys(params)) {
           var k = Object.keys(params[i])[0];
           var v = String(Object.values(params[i])[0]);
-          queryString += template.replace('#key#', this.cronapi.internal.Url.encode(k)).replace('#value#', this.cronapi.internal.Url.encode(v));
+          if (queryString != null) {
+            queryString += "&";
+          }
+          queryString += encodeURIComponent(k) + "=" + encodeURIComponent(v);
+
         }
       }
-      window.location.hash = view + queryString;
+
+      window.location.hash = view + (queryString?"?"+queryString:"");
     }
     catch (e) {
       alert(e);
@@ -901,6 +1082,27 @@
 
   /**
    * @type function
+   * @name {{setActiveTab}}
+   * @nameTags Show| Tab| Exibir| Mostrar | Ativar |  Aba
+   * @platform W
+   * @description {{setActiveTablDesc}}
+   * @param {ObjectType.STRING} component {{ComponentParam}}
+   * @multilayer true
+   */
+  this.cronapi.screen.setActiveTab = function(/** @type {ObjectType.OBJECT} @blockType ids_from_screen*/ id) {
+    this.cronapi.$scope.safeApply( function(){
+      if( $('#'+id).attr('data-target') === undefined){
+        $( '[data-target="#'+ id + '"]' ).tab('show');
+      }
+      else{
+        $('#'+id).tab('show');
+      }
+
+    });
+  };
+
+  /**
+   * @type function
    * @name {{hideModal}}
    * @nameTags Hide| Modal| Esconder | Fechar
    * @description {{hideModalDesc}}
@@ -971,6 +1173,46 @@
     return false;
   };
 
+  /**
+   * @type function
+   * @name {{showLoading}}
+   * @nameTags Show| Loading| Exibir | Carregamento
+   * @description {{showLoadingDesc}}
+   * @platform M
+   */
+  this.cronapi.screen.showLoading = function() {
+    this.cronapi.$scope.$ionicLoading.show({
+      content : 'Loading',
+      animation : 'fade-in',
+      showBackdrop : true,
+      maxWidth : 200,
+      showDelay : 0
+    });
+  };
+
+  /**
+   * @type function
+   * @name {{hideLoading}}
+   * @nameTags Hide| Loading| Esconder | Carregamento
+   * @description {{hideLoadingDesc}}
+   * @platform M
+   */
+  this.cronapi.screen.hide = function() {
+    this.cronapi.$scope.$ionicLoading.hide();
+  };
+
+  /**
+   * @type function
+   * @name {{getHostapp}}
+   * @nameTags Hostapp
+   * @description {{getHostappDesc}}
+   * @platform M
+   * @returns {ObjectType.String}
+   */
+  this.cronapi.screen.getHostapp = function() {
+    return window.hostApp;
+  };
+
 
   /**
    * @type function
@@ -1032,6 +1274,24 @@
   this.cronapi.screen.enableComponent = function(/** @type {ObjectType.OBJECT} @blockType ids_from_screen*/ id) {
     $.each( $('#'+id).find('*').addBack(), function(index, value){ $(value).prop('disabled',false); });
   };
+
+  /**
+   * @type function
+   * @name {{focusComponent}}
+   * @nameTags focus
+   * @description {{focusComponentDesc}}*
+   * @multilayer true
+   */
+  this.cronapi.screen.focusComponent = function(/** @type {ObjectType.OBJECT} @blockType ids_from_screen*/ id) {
+    this.cronapi.$scope.safeApply( function() {
+      if( tinyMCE && tinyMCE.get(id) !== undefined) {
+        tinyMCE.get(id).focus();
+      }else{
+        $('#'+id).find('*').addBack().focus();
+      }
+    });
+  };
+
 
   /**
    * @type function
@@ -1394,7 +1654,7 @@
    * @returns {ObjectType.DATETIME}
    */
   this.cronapi.dateTime.getNow = function() {
-    return this.cronapi.dateTime.getMomentObj(new Date().toLocaleString()).toDate();
+    return moment().toDate();
   };
 
   /**
@@ -1407,29 +1667,7 @@
    * @returns {ObjectType.STRING}
    */
   this.cronapi.dateTime.formatDateTime = function(date, format) {
-    format = format.toLowerCase();
-    if (format.indexOf(':mm') > -1)
-      format = this.cronapi.internal.replaceAll(format, ':mm',':minutes');
-    format = this.cronapi.internal.replaceAll(format, ' ','+" "+');
-    format = this.cronapi.internal.replaceAll(format, ':','+":"+');
-
-    var dateVar = this.cronapi.dateTime.getMomentObj(date);
-    var dd = dateVar.get('date');
-    var mm = dateVar.get('month') + 1;
-    var yyyy = dateVar.get('year');
-    var hh = dateVar.get('hour');
-    var minutes = dateVar.get('minute');
-    var ss = dateVar.get('second');
-    var separator = '';
-    var maskChars = 'dmy';
-    for (var i = 0; i < format.length; i++) {
-      if (!maskChars.includes(format.charAt(i))) {
-        separator = format.charAt(i);
-        var formatLower = this.cronapi.internal.replaceAll(format, separator, '+separator+');
-        return eval(formatLower);
-      }
-    }
-    return '';
+    return moment(new Date()).format(format);
   };
 
   /**
@@ -1804,7 +2042,7 @@
    * @displayInline true
    */
   this.cronapi.logic.isNull = function(/** @type {ObjectType.OBJECT} @description */ value) {
-    return (value === null || typeof value  == 'undefined');
+    return (value === null || typeof value  == 'undefined'  || value == undefined);
   }
 
   /**
@@ -2036,14 +2274,18 @@
     this.cronapi.screen.changeValueOfField(field, base64);
   };
 
-  this.cronapi.internal.castBase64ToByteArray = function(base64) {
-    var binary_string =  window.atob(base64);
+  this.cronapi.internal.castBinaryStringToByteArray = function(binary_string) {
     var len = binary_string.length;
     var bytes = new Uint8Array( len );
     for (var i = 0; i < len; i++)        {
       bytes[i] = binary_string.charCodeAt(i);
     }
     return bytes;
+  };
+
+  this.cronapi.internal.castBase64ToByteArray = function(base64) {
+    var binary_string = window.atob(base64);
+    return this.cronapi.internal.castBinaryStringToByteArray(binary_string);
   };
 
   this.cronapi.internal.castByteArrayToString = function(bytes) {
@@ -2059,7 +2301,7 @@
     catch (e) {
       try {
         //Tenta pegar do header
-        json = JSON.parse(this.cronapi.internal.castByteArrayToString(this.cronapi.internal.castBase64ToByteArray(data)))
+        json = JSON.parse(window.atob(data));
       }
       catch (e) {
         //Verifica se é drpobox
@@ -2072,6 +2314,25 @@
           json.fileExtension = extension;
           json.name = fullName.replace(extension, '');
           json.contentType = 'file/'+extension.replace('.','');
+        }
+        else if (data && data.match(/__odataFile_/g)) {
+          var file = eval(data);
+          var fullNameSplited = file.name.split('.');
+          var extension = '.' + fullNameSplited[fullNameSplited.length - 1];
+
+          json = {};
+          json.fileExtension = extension;
+          json.name = file.name;
+          json.contentType = file.type || 'unknown';
+        }
+        else if (data && this.cronapi.internal.isBase64(data)) {
+          var fileName = 'download';
+          var fileExtesion = this.cronapi.internal.getExtensionBase64(data);
+          fileName += fileExtesion;
+          json = {};
+          json.fileExtension = fileExtesion;
+          json.name = fileName;
+          json.contentType = 'unknown';
         }
       }
     }
@@ -2086,7 +2347,58 @@
     }
   };
 
+  this.cronapi.internal.getExtensionBase64 = function(base64) {
+    if (base64) {
+      var data = base64.substr(0, 5);
+      switch (data.toLocaleUpperCase())
+      {
+        case "IVBOR":
+          return ".png";
+        case "/9J/4":
+          return ".jpg";
+        case "AAAAF":
+          return ".mp4";
+        case "JVBER":
+          return ".pdf";
+        case "AAABA":
+          return ".ico";
+        case "UMFYI":
+          return ".rar";
+        case "E1XYD":
+          return ".rtf";
+        case "U1PKC":
+          return ".txt";
+        case "UESDB":
+          return ".zip";
+        case "MQOWM":
+        case "77U/M":
+          return ".srt";
+        default:
+          return "";
+      }
+    }
+    return "";
+  };
+
+  this.cronapi.internal.isBase64 = function(str) {
+    try {
+      return btoa(atob(str)) == str;
+    } catch (err) {
+      return false;
+    }
+  };
+
   this.cronapi.internal.downloadFileEntity = function(datasource, field, indexData) {
+
+    function downloadUrl(url, fileName) {
+      var link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute("download", fileName);
+      var event = document.createEvent('MouseEvents');
+      event.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
+      link.dispatchEvent(event);
+    }
+
     var tempJsonFileUploaded = null;
     var valueContent;
     var itemActive;
@@ -2117,72 +2429,81 @@
       window.open(valueContent);
     }
     else {
-      var url = '/api/cronapi/downloadFile';
-      var splited = datasource.entity.split('/');
 
-      var entity = splited[splited.length-1];
-      if (entity.indexOf(":") > -1) {
-        //Siginifica que é relacionamento, pega a entidade do relacionamento
-        var entityRelation = '';
-        var splitedDomainBase = splited[3].split('.');
-        for (var i=0; i<splitedDomainBase.length-1;i++)
-          entityRelation += splitedDomainBase[i]+'.';
-        var entityRelationSplited = entity.split(':');
-        entity = entityRelation + entityRelationSplited[entityRelationSplited.length-1];
-      }
-
-      url += '/' + entity;
-      url += '/' + field;
-      var _u = JSON.parse(sessionStorage.getItem('_u'));
-      var object = itemActive;
-
-      var finalUrl = this.cronapi.internal.getAddressWithHostApp(url);
-
-      this.$promise = this.cronapi.$scope.$http({
-        method: 'POST',
-        url: finalUrl,
-        data: (object) ? JSON.stringify(object) : null,
-        responseType: 'blob',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-AUTH-TOKEN': _u.token,
-        }
-      }).success(function(data, status, headers, config) {
-        var octetStreamMime = 'application/octet-stream';
-        headers = headers();
-        var filename = headers['x-filename'] || 'download.bin';
-        var contentType = headers['content-type'] || octetStreamMime;
+      if (datasource.isOData()) {
         var urlCreator = window.URL || window.webkitURL || window.mozURL || window.msURL;
-        try
-        {
-          var link = document.createElement('a');
-          if('download' in link)
+        var bytesOrFileInput;
+        var fileName = 'download';
+
+        if (valueContent.match(/__odataFile_/g)) {
+          bytesOrFileInput = eval(valueContent);
+          fileName = bytesOrFileInput.name
+        }
+        else {
+          fileName += this.cronapi.internal.getExtensionBase64(valueContent);
+          valueContent = window.atob(valueContent);
+          bytesOrFileInput = this.cronapi.internal.castBinaryStringToByteArray(valueContent);
+        }
+        var url = urlCreator.createObjectURL(new Blob([bytesOrFileInput],{type: 'application/octet-stream'}));
+        downloadUrl(url, fileName);
+      }
+      else {
+        var url = '/api/cronapi/downloadFile';
+        var splited = datasource.entity.split('/');
+
+        var entity = splited[splited.length-1];
+        if (entity.indexOf(":") > -1) {
+          //Siginifica que é relacionamento, pega a entidade do relacionamento
+          var entityRelation = '';
+          var splitedDomainBase = splited[3].split('.');
+          for (var i=0; i<splitedDomainBase.length-1;i++)
+            entityRelation += splitedDomainBase[i]+'.';
+          var entityRelationSplited = entity.split(':');
+          entity = entityRelation + entityRelationSplited[entityRelationSplited.length-1];
+        }
+
+        url += '/' + entity;
+        url += '/' + field;
+        var _u = JSON.parse(localStorage.getItem('_u'));
+        var object = itemActive;
+
+        var finalUrl = this.cronapi.internal.getAddressWithHostApp(url);
+
+        this.$promise = this.cronapi.$scope.$http({
+          method: 'POST',
+          url: finalUrl,
+          data: (object) ? JSON.stringify(object) : null,
+          responseType: 'blob',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AUTH-TOKEN': _u.token,
+          }
+        }).success(function(data, status, headers, config) {
+          headers = headers();
+          var filename = headers['x-filename'] || 'download.bin';
+          var urlCreator = window.URL || window.webkitURL || window.mozURL || window.msURL;
+          try
           {
             var url = urlCreator.createObjectURL(data);
-            link.setAttribute('href', url);
-            link.setAttribute("download", filename);
-            var event = document.createEvent('MouseEvents');
-            event.initMouseEvent('click', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 0, null);
-            link.dispatchEvent(event);
+            downloadUrl(url, filename);
+          } catch(ex) {
+            console.log('Error downloading file');
+            console.log(ex);
           }
-        } catch(ex) {
+        }.bind(this)).error(function(data, status, headers, config) {
           console.log('Error downloading file');
-          console.log(ex);
-        }
-      }.bind(this)).error(function(data, status, headers, config) {
-        console.log('Error downloading file');
-      }.bind(this));
+        }.bind(this));
+      }
+
     }
 
   };
 
-  this.cronapi.internal.uploadFile = function(field, file, progressId) {
-    if (!file)
-      return;
+  this.cronapi.internal.uploadFileAjax = function(field, file, progressId) {
     var uploadUrl = '/api/cronapi/uploadFile';
     var formData = new FormData();
     formData.append("file", file);
-    var _u = JSON.parse(sessionStorage.getItem('_u'));
+    var _u = JSON.parse(localStorage.getItem('_u'));
 
     var finalUrl = this.cronapi.internal.getAddressWithHostApp(uploadUrl);
 
@@ -2222,6 +2543,40 @@
     }.bind(this)).error(function(data, status, headers, config) {
       alert('Error uploading file');
     }.bind(this));
+
+  };
+
+  this.cronapi.internal.uploadFile = function(field, file, progressId) {
+    if (!file)
+      return;
+
+    var regexForDatasource = /(.*?).active./g;
+    var groupDatasource = regexForDatasource.exec(field);
+    //Verificar se é campo de um datasource
+    if (groupDatasource) {
+      var datasource = eval(groupDatasource[1]);
+      if (datasource.isOData()) {
+
+        var regexForField = /.active.([a-zA-Z0-9]*)/g;
+        var groupField = regexForField.exec(field);
+        var fieldName = groupField[1];
+
+        var schemaField = datasource.getFieldSchema(fieldName);
+        if (schemaField && schemaField.type == 'Binary') {
+          datasource.active['__odataFile_' + fieldName] = file;
+          datasource.active[fieldName] = datasource.name + '.active.__odataFile_' +  fieldName;
+        }
+        else {
+          this.cronapi.internal.uploadFileAjax(field, file, progressId);
+        }
+      }
+      else {
+        this.cronapi.internal.uploadFileAjax(field, file, progressId);
+      }
+    }
+    else {
+      this.cronapi.internal.uploadFileAjax(field, file, progressId);
+    }
   };
 
   /**
@@ -2299,6 +2654,30 @@
   };
 
   /**
+   * @type function
+   * @name {{serializeObject}}
+   * @description {{serializeObjectDescription}}
+   * @nameTags object
+   * @param {ObjectType.STRING} string {{string}}
+   * @returns {ObjectType.OBJECT}
+   */
+  this.cronapi.object.serializeObject = function(obj) {
+    return JSON.stringify(obj);
+  };
+
+  /**
+   * @type function
+   * @name {{deleteProperty}}
+   * @description {{deletePropertyDescription}}
+   * @nameTags object
+   * @param {ObjectType.OBJECT} object {{object}}
+   * @param {ObjectType.STRING} key {{key}}
+   */
+  this.cronapi.object.deleteProperty = function(obj, key) {
+    delete obj[key];
+  };
+
+  /**
    * @category CategoryType.DEVICE
    * @categoryTags CORDOVA|cordova|Dispositivos|device|Device
    */
@@ -2315,6 +2694,35 @@
    */
   this.cronapi.cordova.vibrate = function(vibrateValue){
     navigator.vibrate(vibrateValue);
+  };
+
+  this.cronapi.cordova.device = {};
+
+  /**
+   *  @type function
+   * @platform M
+   * @name {{getFirebaseToken}}
+   * @nameTags firebase|token|push|notification
+   * @param {ObjectType.STATEMENTSENDER} success {{success}}
+   * @param {ObjectType.STATEMENTSENDER} error {{error}}
+   * @description {{getFirebaseTokenDescription}}
+   * @returns {ObjectType.VOID}
+   */
+  this.cronapi.cordova.device.getFirebaseToken = function(success,error){
+    window.FirebasePlugin.getToken(success,error);
+  };
+
+  /**
+   *  @type function
+   * @platform M
+   * @name {{getDeviceInfo}}
+   * @nameTags device|dispositivo|info
+   * @param {ObjectType.STRING} type {{type}}
+   * @description {{getDeviceInfoDescription}}
+   * @returns {ObjectType.STRING}
+   */
+  this.cronapi.cordova.device.getDeviceInfo = function( /** @type {ObjectType.STRING} @description {{type}} @blockType util_dropdown @keys uuid|model|platform|version|manufacturer|isVirtual|serial @values uuid|model|platform|version|manufacturer|isVirtual|serial  */ type){
+    return window.device[type];
   };
 
   this.cronapi.cordova.geolocation = {};
@@ -2656,12 +3064,10 @@
    */
   this.cronapi.cordova.database.openDatabase = function(dbName) {
     if (!dbName) {
-      this.cronapi.cordova.database.name = this.cronapi.cordova.database.nameDefault;
-      if (window.BuildInfo) {
-        this.cronapi.cordova.database.name = BuildInfo.packageName;
-      }
+      return window.openDatabase(this.cronapi.cordova.database.nameDefault, "1.0",this.cronapi.cordova.database.nameDefault,1000000);
+    }else{
+      return window.openDatabase(dbName, "1.0", dbName, 1000000);
     }
-    this.cronapi.cordova.database.object = window.openDatabase({ name : this.cronapi.cordova.database.name });
   };
 
   /**
@@ -2669,6 +3075,7 @@
    * @platform M
    * @name {{executeSql}}
    * @nameTags executesql
+   * @param {ObjectType.STRING} dbName {{dbName}}
    * @param {ObjectType.STRING} text {{text}}
    * @param {ObjectType.OBJECT} array {{arrayParams}}
    * @param {ObjectType.STATEMENTSENDER} success {{success}}
@@ -2676,16 +3083,15 @@
    * @description {{executeSqlDescription}}
    * @returns {ObjectType.VOID}
    */
-  this.cronapi.cordova.database.executeSql = function(text, array, success , error){
+  this.cronapi.cordova.database.executeSql = function(dbName,text, array, success , error){
 
     // exist DB
-    if (!this.cronapi.cordova.database.object)
-      this.cronapi.cordova.database.openDatabase(); // create DB
+    var db = this.cronapi.cordova.database.openDatabase(dbName); // create DB
 
     // open transaction
-    this.cronapi.cordova.database.object.transaction(function(connect){
+    db.transaction(function(connect){
       // execute SQL
-      connect.executeSql(text,array, success);
+      connect.executeSql(text,array, function(a,b){success.call(this,Object.values(b.rows))}.bind(this));
     }.bind(this), function(e){
       // error
       console.log(e);
@@ -2787,7 +3193,7 @@
     urlWithoutEndSlash = urlWithoutEndSlash.endsWith('/') ? urlWithoutEndSlash.substr(0, urlWithoutEndSlash.length - 1): urlWithoutEndSlash;
     if (address) {
       var addressWithoutStartSlash = address.startsWith('/') ? address.substr(1) : address;
-      urlWithoutEndSlash = urlWithoutEndSlash + '/' + addressWithoutStartSlash;
+      urlWithoutEndSlash === "" ? urlWithoutEndSlash = addressWithoutStartSlash : urlWithoutEndSlash = urlWithoutEndSlash + '/' + addressWithoutStartSlash;
     }
     return urlWithoutEndSlash;
   };

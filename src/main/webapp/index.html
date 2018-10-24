@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en" ng-app="MyApp">
- <head> 
+ <head>
+  <link rel="stylesheet" href="plugins/cronapp-framework-js/dist/js/kendo-ui/styles/kendo.cerulean.mobile.min.css?v=2.0.0">
+  <link rel="stylesheet" href="plugins/cronapp-framework-js/dist/js/kendo-ui/styles/kendo.cerulean.css?v=2.0.0">
+  <link rel="stylesheet" href="plugins/cronapp-framework-js/dist/js/kendo-ui/styles/kendo.common.min.css?v=2.0.0"> 
   <meta charset="utf-8"> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
   <meta http-equiv="X-UA-Compatible" content="IE=5,9,10,11;Edge"> 
@@ -16,8 +19,7 @@
   <link id="themeSytleSheet" rel="stylesheet" href="plugins/cronapp-framework-js/css/themes/cerulean.min.css"> 
   <link rel="stylesheet" href="css/app.css"> 
   <script src="js/customModules.js"></script> 
-  <script src="js/customStateProvider.js"></script> 
-  <link rel="stylesheet" href="plugins/summernote/dist/summernote.css"> 
+  <script src="js/customStateProvider.js"></script>  
  </head> 
  <body> 
   <div ui-view class="fill"></div> 
@@ -68,7 +70,6 @@
   <script src="plugins/cronapp-framework-js/dist/js/LanguageSelectDirective.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/js/directives.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/js/filters.js"></script> 
-  <script src="plugins/cronapp-framework-js/dist/components/js/datasource.js"></script> 
   <!-- CronApp Reports --> 
   <script src="plugins/cronapp-framework-js/dist/js/reports/parameters.controller.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/js/reports/reports.service.js"></script> 
@@ -78,13 +79,15 @@
   <script src="plugins/cronapp-framework-js/dist/components/js/jquery.inputmask.bundle.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/js/upload.service.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/components/js/format.min.js"></script> 
-  <script src="js/system-events.js"></script> 
-  <script src="plugins/angular-summernote/dist/angular-summernote.min.js"></script> 
-  <script src="plugins/summernote/dist/summernote.js"></script> 
-  <script src="plugins/summernote/dist/lang/summernote-pt-BR.min.js"></script> 
+  <script src="js/system-events.js"></script>    
   <script src="plugins/cronapp-framework-js/dist/components/js/qrcode.js"></script> 
   <script src="plugins/cronapp-framework-js/dist/js/tinymce/plugins/tinymce/tinymce.min.js"></script> 
-  <script src="plugins/cronapp-framework-js/dist/js/tinymce/plugins/angular-ui-tinymce/dist/tinymce.min.js"></script>  
-  
+  <script src="plugins/cronapp-framework-js/dist/js/tinymce/plugins/angular-ui-tinymce/dist/tinymce.min.js"></script> 
+  <script src="plugins/cronapp-common-js/dist/js/parser.js"></script> 
+  <script src="plugins/cronapp-common-js/dist/js/datasource/datasource.js"></script>  
+  <script src="plugins/cronapp-framework-js/dist/js/kendo-ui/js/jszip.min.js"></script>
+  <script src="js/dataSourceMap.js"></script>
+  <script src="plugins/cronapp-framework-js/dist/js/kendo-ui/js/kendo.all.fixed.js"></script>
+  <script src="plugins/cronapp-framework-js/dist/js/kendo-ui/js/cultures/kendo.culture.pt-BR.min.js"></script>
  </body>
 </html>
